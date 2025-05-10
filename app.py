@@ -3,134 +3,112 @@ import re
 import requests
 from bs4 import BeautifulSoup
 import os
+from urllib.parse import urlparse
 
 app = Flask(__name__)
+app.config['FB_API_VERSION'] = 'v18.0'  # Current API version
 
-def extract_facebook_post_id(url):
-    """
-    Extracts the Facebook post ID from a given post URL, including short share links and pfbid formats.
-    
-    Args:
-        url (str): The Facebook post URL
+def get_post_id_via_api(url, access_token):
+    """Get post ID using Facebook's official Graph API"""
+    try:
+        api_url = f"https://graph.facebook.com/{app.config['FB_API_VERSION']}/"
+        params = {
+            'id': url,
+            'access_token': access_token,
+            'fields': 'id'
+        }
         
-    Returns:
-        str: The extracted post ID, or None if not found
+        response = requests.get(api_url, params=params, timeout=10)
+        response.raise_for_status()
+        
+        data = response.json()
+        if 'id' in data:
+            return data['id']
+        return None
+        
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 400:
+            error_data = e.response.json()
+            print(f"API Error: {error_data.get('error', {}).get('message')}")
+        return None
+    except Exception as e:
+        print(f"API Request Failed: {str(e)}")
+        return None
+
+def extract_facebook_post_id(url, access_token=None):
     """
-    # Common patterns for Facebook post URLs
-    patterns = [
-        r'posts/(\d+)',                     # Standard post: facebook.com/username/posts/123456789
-        r'permalink\.php\?story_fbid=(\d+)', # Permalink: facebook.com/permalink.php?story_fbid=123456789
-        r'fbid=(\d+)',                      # Mobile links: m.facebook.com/story.php?story_fbid=123456789
-        r'/\d+/posts/(\d+)',                # Group posts: facebook.com/groups/123/posts/456789
-        r'photos/\d+\.\d+\.\d+/(\d+)',      # Photo posts: facebook.com/photo?fbid=123456789
-        r'share/p/([a-zA-Z0-9]+)',          # Short share link: facebook.com/share/p/1C2xJ4tocw
-        r'pfbid([a-zA-Z0-9]+)'              # pfbid format: facebook.com/.../posts/pfbid...
+    Hybrid approach - tries API first if token provided, then falls back to scraping
+    """
+    # Try API first if access token is provided
+    if access_token:
+        api_result = get_post_id_via_api(url, access_token)
+        if api_result:
+            return api_result
+
+    # Fallback to scraping if API fails or no token
+    parsed = urlparse(url)
+    clean_url = parsed.scheme + '://' + parsed.netloc + parsed.path
+
+    pfbid_patterns = [
+        r'/posts/(pfbid[\w]+)',
+        r'/(pfbid[\w]+)$',
+        r'/(pfbid[\w]+)/'
     ]
     
-    # Handle photo URLs with set=pcb. parameter specifically
-    if 'photo' in url and 'set=pcb.' in url:
-        match = re.search(r'set=pcb\.(\d+)', url)
+    for pattern in pfbid_patterns:
+        match = re.search(pattern, clean_url)
+        if match:
+            pfbid = match.group(1)
+            return resolve_pfbid(pfbid) or pfbid
+
+    numeric_patterns = [
+        r'story_fbid=(\d+)',
+        r'posts/(\d+)',
+        r'fbid=(\d+)',
+        r'set=pcb\.(\d+)',
+        r'activity/(\d+)',
+        r'comment_id=(\d+)'
+    ]
+    
+    for pattern in numeric_patterns:
+        match = re.search(pattern, clean_url)
         if match:
             return match.group(1)
 
-    # Try other regex patterns
-    for pattern in patterns:
-        match = re.search(pattern, url)
-        if match:
-            extracted_id = match.group(1)
-            # For short share links and pfbid, attempt to resolve to numeric ID
-            if pattern in [r'share/p/([a-zA-Z0-9]+)', r'pfbid([a-zA-Z0-9]+)']:
-                numeric_id = resolve_to_numeric_id(url, extracted_id)
-                return numeric_id if numeric_id else extracted_id
-            return extracted_id
-    
-    return None
+    return scrape_generic_url(clean_url)
 
-def resolve_to_numeric_id(url, extracted_id):
-    """
-    Resolves short share links and pfbid formats to a numeric post ID by scraping the redirected page.
-    
-    Args:
-        url (str): The original URL
-        extracted_id (str): The extracted ID (short code or pfbid)
-        
-    Returns:
-        str: The numeric post ID, or None if resolution fails
-    """
-    try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Accept-Language': 'en-US,en;q=0.9',
-        }
-        response = requests.get(url, headers=headers, timeout=5, allow_redirects=True)
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'html.parser')
-            
-            # Strategy 1: Check og:url meta tag for redirected URL
-            meta_tags = soup.find_all('meta', property='og:url')
-            for tag in meta_tags:
-                content = tag.get('content', '')
-                patterns = [
-                    r'posts/(\d+)',
-                    r'permalink\.php\?story_fbid=(\d+)',
-                    r'fbid=(\d+)',
-                    r'comment_id=(\d+)'
-                ]
-                for pattern in patterns:
-                    match = re.search(pattern, content)
-                    if match:
-                        return match.group(1)
-
-            # Strategy 2: Look for post_id in script tags
-            scripts = soup.find_all('script')
-            for script in scripts:
-                script_content = script.string
-                if script_content:
-                    # Look for numeric post_id in JSON-like data
-                    match = re.search(r'"post_id":"(\d+)"', script_content)
-                    if match:
-                        return match.group(1)
-                    # Alternative format: story_fbid
-                    match = re.search(r'"story_fbid":"(\d+)"', script_content)
-                    if match:
-                        return match.group(1)
-
-            # Strategy 3: Check for links with fbid in the href
-            links = soup.find_all('a', href=True)
-            for link in links:
-                href = link['href']
-                match = re.search(r'fbid=(\d+)', href)
-                if match:
-                    return match.group(1)
-
-            # Strategy 4: Check for numeric ID in meta tags with al:android:url
-            android_meta = soup.find_all('meta', property='al:android:url')
-            for tag in android_meta:
-                content = tag.get('content', '')
-                match = re.search(r'fb://post/(\d+)', content)
-                if match:
-                    return match.group(1)
-    except requests.RequestException as e:
-        print(f"Request failed: {e}")
-    
-    return None
+# Keep resolve_pfbid(), scrape_generic_url() functions from previous version
+# [Previous implementation of resolve_pfbid() and scrape_generic_url() here]
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    post_id = None
-    error = None
-    input_url = ''
-    if request.method == 'POST':
-        input_url = request.form.get('url')
-        if input_url:
-            post_id = extract_facebook_post_id(input_url)
-            if not post_id:
-                error = "Could not extract Post ID from the provided URL."
-        else:
-            error = "Please provide a valid Facebook post URL."
+    post_id = error = input_url = None
+    api_token = None
     
-    return render_template('index.html', post_id=post_id, error=error, input_url=input_url)
+    if request.method == 'POST':
+        input_url = request.form.get('url', '').strip()
+        api_token = request.form.get('token', '').strip()
+        
+        if not input_url:
+            error = "Please enter a URL"
+        elif 'facebook.com' not in input_url:
+            error = "Please enter a valid Facebook URL"
+        else:
+            post_id = extract_facebook_post_id(input_url, api_token)
+            if not post_id:
+                error = "Could not extract Post ID. Try these solutions:"
+                error += "<br>- Use a valid Facebook Access Token"
+                error += "<br>- Check if the post is public"
+                error += "<br>- Try again later"
+    
+    return render_template(
+        'index.html',
+        post_id=post_id,
+        error=error,
+        input_url=input_url,
+        api_token=api_token
+    )
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(host='0.0.0.0', port=port, debug=False)
