@@ -139,11 +139,11 @@
     <form method="POST">
       <div class="form-group">
         <label for="url">Post URL</label>
-        <input type="text" id="url" name="url" value="{{ input_url }}" placeholder="https://facebook.com/..." required>
+        <input type="text" id="url" name="url" value="{{ input_url or '' }}" ...>
       </div>
       <div class="form-group">
         <label for="token">Access Token (Optional)</label>
-        <input type="text" id="token" name="token" value="{{ api_token }}" placeholder="EAAG...">
+        <input type="text" id="token" name="token" value="{{ api_token or '' }}" ...>
         <small><span style="margin-right: 10px;">Click Here To</span><a href="https://www.facebook.com/TabbuArain/" target="_blank">Get Help !</a></small>
 
       </div>
