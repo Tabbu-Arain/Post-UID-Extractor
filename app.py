@@ -82,8 +82,8 @@ def extract_facebook_post_id(url, access_token= None):
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    post_id = error = input_url =
-    api_token =
+    post_id = error = input_url = None
+    api_token = None
     
     if request.method == 'POST':
         input_url = request.form.get('url', '').strip()
