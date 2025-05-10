@@ -27,28 +27,35 @@ def extract_facebook_post_id(url):
         r'pfbid([a-zA-Z0-9]+)'              # pfbid format: facebook.com/.../posts/pfbid...
     ]
     
-    # Try regex patterns first
+    # Handle photo URLs with set=pcb. parameter specifically
+    if 'photo' in url and 'set=pcb.' in url:
+        match = re.search(r'set=pcb\.(\d+)', url)
+        if match:
+            return match.group(1)
+
+    # Try other regex patterns
     for pattern in patterns:
         match = re.search(pattern, url)
         if match:
-            short_code = match.group(1)
-            # For short share links, attempt to resolve to numeric ID
-            if pattern == r'share/p/([a-zA-Z0-9]+)':
-                return resolve_short_link(url, short_code)
-            return short_code
+            extracted_id = match.group(1)
+            # For short share links and pfbid, attempt to resolve to numeric ID
+            if pattern in [r'share/p/([a-zA-Z0-9]+)', r'pfbid([a-zA-Z0-9]+)']:
+                numeric_id = resolve_to_numeric_id(url, extracted_id)
+                return numeric_id if numeric_id else extracted_id
+            return extracted_id
     
     return None
 
-def resolve_short_link(url, short_code):
+def resolve_to_numeric_id(url, extracted_id):
     """
-    Resolves short share links to find the numeric post ID by scraping the redirected page.
+    Resolves short share links and pfbid formats to a numeric post ID by scraping the redirected page.
     
     Args:
-        url (str): The original short URL
-        short_code (str): The extracted short code
+        url (str): The original URL
+        extracted_id (str): The extracted ID (short code or pfbid)
         
     Returns:
-        str: The numeric post ID, or the short code if resolution fails
+        str: The numeric post ID, or None if resolution fails
     """
     try:
         headers = {
@@ -59,6 +66,7 @@ def resolve_short_link(url, short_code):
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
             
+            # Strategy 1: Check og:url meta tag for redirected URL
             meta_tags = soup.find_all('meta', property='og:url')
             for tag in meta_tags:
                 content = tag.get('content', '')
@@ -73,24 +81,39 @@ def resolve_short_link(url, short_code):
                     if match:
                         return match.group(1)
 
+            # Strategy 2: Look for post_id in script tags
             scripts = soup.find_all('script')
             for script in scripts:
                 script_content = script.string
                 if script_content:
+                    # Look for numeric post_id in JSON-like data
                     match = re.search(r'"post_id":"(\d+)"', script_content)
                     if match:
                         return match.group(1)
-            
+                    # Alternative format: story_fbid
+                    match = re.search(r'"story_fbid":"(\d+)"', script_content)
+                    if match:
+                        return match.group(1)
+
+            # Strategy 3: Check for links with fbid in the href
             links = soup.find_all('a', href=True)
             for link in links:
                 href = link['href']
                 match = re.search(r'fbid=(\d+)', href)
                 if match:
                     return match.group(1)
+
+            # Strategy 4: Check for numeric ID in meta tags with al:android:url
+            android_meta = soup.find_all('meta', property='al:android:url')
+            for tag in android_meta:
+                content = tag.get('content', '')
+                match = re.search(r'fb://post/(\d+)', content)
+                if match:
+                    return match.group(1)
     except requests.RequestException as e:
         print(f"Request failed: {e}")
     
-    return short_code
+    return None
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
