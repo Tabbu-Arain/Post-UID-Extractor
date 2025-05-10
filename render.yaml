@@ -1,10 +1,11 @@
 services:
   - type: web
-    name: flask-login-app
+    name: facebook-post-id-extractor
     env: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    startCommand: gunicorn facebook_post_uid_service:app
+    autoDeploy: true
     envVars:
-      - key: SECRET_KEY
-        sync: false  # Set manually in Render dashboard
+      - key: PYTHON_VERSION
+        value: 3.11
