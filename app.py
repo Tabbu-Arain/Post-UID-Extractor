@@ -35,7 +35,7 @@ def get_post_id_via_api(url, access_token):
         print(f"API Request Failed: {str(e)}")
         return None
 
-def extract_facebook_post_id(url, access_token=None):
+def extract_facebook_post_id(url, access_token= None):
     """
     Hybrid approach - tries API first if token provided, then falls back to scraping
     """
@@ -82,8 +82,8 @@ def extract_facebook_post_id(url, access_token=None):
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    post_id = error = input_url = None
-    api_token = None
+    post_id = error = input_url =
+    api_token =
     
     if request.method == 'POST':
         input_url = request.form.get('url', '').strip()
