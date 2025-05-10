@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facebook Post ID Extractor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .copy-btn.copied {
+            @apply bg-gray-700;
+        }
+        .container {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+        }
+        .container:hover {
+            transform: scale(1.02);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+        }
+        .copy-btn {
+            transition: all 0.3s ease;
+        }
+        .copy-btn:hover:not(.copied) {
+            @apply bg-red-700 scale-105;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        .animate-pulse {
+            animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+        .popup {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) translateY(20px);
+            background-color: #1f2937;
+            color: #f87171;
+            padding: 12px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            opacity: 0;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            z-index: 1000;
+        }
+        .popup.show {
+            opacity: 1;
+            transform: translate(-50%, -50%) translateY(0);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 min-h-screen flex items-center justify-center p-4">
+    <div class="container max-w-md w-full bg-gray-800 rounded-xl shadow-lg p-6">
+        <h1 class="text-2xl font-bold text-center text-red-500 mb-6">Facebook Post ID Extractor</h1>
+        
+        <form method="POST" id="postForm" class="space-y-4">
+            <div>
+                <input 
+                    type="text" 
+                    name="url" 
+                    id="urlInput"
+                    placeholder="Enter Facebook post URL" 
+                    value="{{ input_url }}"
+                    class="w-full p-3 bg-gray-700 text-white border border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition placeholder-gray-400"
+                    aria-label="Facebook post URL"
+                    required
+                >
+                <p id="urlError" class="text-red-400 text-sm mt-1 hidden">Please enter a valid Facebook URL</p>
+            </div>
+            
+            <button 
+                type="submit" 
+                id="submitBtn"
+                class="w-full bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 transition disabled:bg-red-800 disabled:cursor-not-allowed"
+            >
+                Get Post ID
+            </button>
+        </form>
+
+        {% if post_id %}
+        <div class="mt-6 p-4 bg-gray-700 rounded-lg flex items-center justify-between">
+            <span class="text-gray-200 font-medium">Post ID: {{ post_id }}</span>
+            <button 
+                class="copy-btn px-4 py-2 bg-red-600 text-white rounded-lg"
+                onclick="copyToClipboard('{{ post_id }}', this)"
+                aria-label="Copy Post ID"
+            >
+                Copy
+            </button>
+        </div>
+        {% endif %}
+
+        {% if error %}
+        <div class="mt-4 p-4 bg-red-900 text-red-300 rounded-lg">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        <div id="copyPopup" class="popup" role="alert" aria-live="polite">
+            Copied Successfully
+        </div>
+    </div>
+
+    <script>
+        const urlInput = document.getElementById('urlInput');
+        const urlError = document.getElementById('urlError');
+        const submitBtn = document.getElementById('submitBtn');
+        const form = document.getElementById('postForm');
+        const copyPopup = document.getElementById('copyPopup');
+
+        // Validate URL in real-time
+        urlInput.addEventListener('input', () => {
+            const url = urlInput.value.trim();
+            const fbUrlPattern = /^(https?:\/\/)?(www\.)?(facebook|fb)\.com\/.+/i;
+            
+            if (url && !fbUrlPattern.test(url)) {
+                urlError.classList.remove('hidden');
+                submitBtn.disabled = true;
+            } else {
+                urlError.classList.add('hidden');
+                submitBtn.disabled = false;
+            }
+        });
+
+        // Handle form submission
+        form.addEventListener('submit', (e) => {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Processing...';
+            submitBtn.classList.add('animate-pulse');
+        });
+
+        function copyToClipboard(text, button) {
+            navigator.clipboard.writeText(text).then(() => {
+                button.classList.add('copied');
+
+                // Show popup
+                copyPopup.classList.add('show');
+                setTimeout(() => {
+                    copyPopup.classList.remove('show');
+                    button.classList.remove('copied');
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+                alert('Failed to copy Post ID');
+            });
+        }
+
+        // Reset button state after page load
+        window.addEventListener('load', () => {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Get Post ID';
+            submitBtn.classList.remove('animate-pulse');
+        });
+    </script>
+</body>
+</html>
