@@ -2,12 +2,13 @@ from flask import Flask, request, render_template
 import re
 import requests
 from bs4 import BeautifulSoup
+import os
 
 app = Flask(__name__)
 
 def extract_facebook_post_id(url):
     """
-    Extracts the Facebook post ID from a given post URL, including short share links.
+    Extracts the Facebook post ID from a given post URL, including short share links and pfbid formats.
     
     Args:
         url (str): The Facebook post URL
@@ -22,7 +23,8 @@ def extract_facebook_post_id(url):
         r'fbid=(\d+)',                      # Mobile links: m.facebook.com/story.php?story_fbid=123456789
         r'/\d+/posts/(\d+)',                # Group posts: facebook.com/groups/123/posts/456789
         r'photos/\d+\.\d+\.\d+/(\d+)',      # Photo posts: facebook.com/photo?fbid=123456789
-        r'share/p/([a-zA-Z0-9]+)'           # Short share link: facebook.com/share/p/1C2xJ4tocw
+        r'share/p/([a-zA-Z0-9]+)',          # Short share link: facebook.com/share/p/1C2xJ4tocw
+        r'pfbid([a-zA-Z0-9]+)'              # pfbid format: facebook.com/.../posts/pfbid...
     ]
     
     # Try regex patterns first
@@ -39,7 +41,7 @@ def extract_facebook_post_id(url):
 
 def resolve_short_link(url, short_code):
     """
-    Attempts to resolve short share links to find the numeric post ID.
+    Resolves short share links to find the numeric post ID by scraping the redirected page.
     
     Args:
         url (str): The original short URL
@@ -49,28 +51,45 @@ def resolve_short_link(url, short_code):
         str: The numeric post ID, or the short code if resolution fails
     """
     try:
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept-Language': 'en-US,en;q=0.9',
+        }
         response = requests.get(url, headers=headers, timeout=5, allow_redirects=True)
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
-            # Look for meta tags with the redirected post URL
+            
             meta_tags = soup.find_all('meta', property='og:url')
             for tag in meta_tags:
                 content = tag.get('content', '')
-                # Try extracting ID from the redirected URL
                 patterns = [
                     r'posts/(\d+)',
                     r'permalink\.php\?story_fbid=(\d+)',
-                    r'fbid=(\d+)'
+                    r'fbid=(\d+)',
+                    r'comment_id=(\d+)'
                 ]
                 for pattern in patterns:
                     match = re.search(pattern, content)
                     if match:
                         return match.group(1)
-    except requests.RequestException:
-        pass
+
+            scripts = soup.find_all('script')
+            for script in scripts:
+                script_content = script.string
+                if script_content:
+                    match = re.search(r'"post_id":"(\d+)"', script_content)
+                    if match:
+                        return match.group(1)
+            
+            links = soup.find_all('a', href=True)
+            for link in links:
+                href = link['href']
+                match = re.search(r'fbid=(\d+)', href)
+                if match:
+                    return match.group(1)
+    except requests.RequestException as e:
+        print(f"Request failed: {e}")
     
-    # Return short code if resolution fails
     return short_code
 
 @app.route('/', methods=['GET', 'POST'])
@@ -90,5 +109,5 @@ def index():
     return render_template('index.html', post_id=post_id, error=error, input_url=input_url)
 
 if __name__ == '__main__':
-    app.run(debug=True)
-app.run(host='0.0.0.0', port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
