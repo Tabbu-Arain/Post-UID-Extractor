@@ -1,23 +1,24 @@
 from flask import Flask, render_template, request
-import requests
-import re
-import os
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from webdriver_manager.chrome import ChromeDriverManager
+import time
+import os  # You can use this if needed for environment variables or file paths
+import re  # If you need regex functionality later
 
 app = Flask(__name__)
 
 def extract_eaab_token(cookie):
-    session = requests.Session()
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-                      '(KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Connection': 'keep-alive',
-        'Referer': 'https://www.facebook.com/',
-        'Cookie': cookie
-    }
+    # Set up Selenium options for headless mode
+    chrome_options = Options()
+    chrome_options.add_argument('--headless')  # Run headlessly (no UI)
+    chrome_options.add_argument('--disable-gpu')
+    chrome_options.add_argument('--no-sandbox')
+    
+    # Initialize the Selenium WebDriver (using Chrome in headless mode)
+    driver = webdriver.Chrome(ChromeDriverManager().install(), options=chrome_options)
 
-    # URLs to try to extract the EAAB token
+    # Set the Facebook URL (a page where the EAAB token might be found)
     urls_to_try = [
         "https://business.facebook.com/content_management",
         "https://www.facebook.com/adsmanager/manage/campaigns",
@@ -25,23 +26,28 @@ def extract_eaab_token(cookie):
         "https://graph.facebook.com/me"
     ]
 
+    # Add the cookie to the browser session
+    driver.get("https://www.facebook.com/")
+    driver.add_cookie({"name": "cookie", "value": cookie, "domain": "facebook.com"})
+
     for url in urls_to_try:
         try:
-            print(f"Trying URL: {url}")  # Debugging log
-            res = session.get(url, headers=headers, timeout=10)
+            driver.get(url)
+            time.sleep(5)  # Wait for the page to load fully (you may need to adjust this delay)
+            
+            # Retrieve the page content
+            page_source = driver.page_source
+            if 'EAAB' in page_source:
+                # Search for the EAAB token in the page source
+                start_index = page_source.find('EAAB')
+                end_index = page_source.find(' ', start_index)
+                token = page_source[start_index:end_index]
+                driver.quit()
+                return token
+        except Exception as e:
+            print(f"Error on {url}: {e}")
 
-            # Debugging: Log the response text to check if the EAAB token is in there
-            print(res.text[:1000])  # Print the first 1000 characters of the response for debugging
-
-            match = re.search(r'(EAAB\w+)', res.text)
-            if match:
-                print(f"Found EAAB Token: {match.group(1)}")  # Debugging log
-                return match.group(1)
-
-        except requests.exceptions.RequestException as e:
-            print(f"Error with URL {url}: {e}")  # Error log
-            continue
-
+    driver.quit()
     return None
 
 @app.route('/', methods=['GET'])
