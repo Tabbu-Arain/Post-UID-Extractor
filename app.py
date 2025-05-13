@@ -1,24 +1,35 @@
 from flask import Flask, render_template, request
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
-import time
-import os  # You can use this if needed for environment variables or file paths
-import re  # If you need regex functionality later
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+import shutil
+import os
+import re
 
 app = Flask(__name__)
 
 def extract_eaab_token(cookie):
-    # Set up Selenium options for headless mode
     chrome_options = Options()
-    chrome_options.add_argument('--headless')  # Run headlessly (no UI)
+    chrome_options.add_argument('--headless')
     chrome_options.add_argument('--disable-gpu')
     chrome_options.add_argument('--no-sandbox')
-    
-    # Initialize the Selenium WebDriver (using Chrome in headless mode)
-    driver = webdriver.Chrome(ChromeDriverManager().install(), options=chrome_options)
+    chrome_options.add_argument('--disable-dev-shm-usage')
+    chrome_options.add_argument('--disable-software-rasterizer')
 
-    # Set the Facebook URL (a page where the EAAB token might be found)
+    # Render-specific Chromium path
+    chrome_path = shutil.which("chromium-browser") or shutil.which("chromium")
+    driver_path = shutil.which("chromedriver")
+
+    if not chrome_path or not driver_path:
+        return "Chromium or Chromedriver not found. Make sure they are installed on the server."
+
+    chrome_options.binary_location = chrome_path
+
+    # Initialize the driver
+    driver = webdriver.Chrome(executable_path=driver_path, options=chrome_options)
+
     urls_to_try = [
         "https://business.facebook.com/content_management",
         "https://www.facebook.com/adsmanager/manage/campaigns",
@@ -26,28 +37,29 @@ def extract_eaab_token(cookie):
         "https://graph.facebook.com/me"
     ]
 
-    # Add the cookie to the browser session
-    driver.get("https://www.facebook.com/")
-    driver.add_cookie({"name": "cookie", "value": cookie, "domain": "facebook.com"})
+    try:
+        driver.get("https://www.facebook.com/")
+        driver.add_cookie({"name": "cookie", "value": cookie, "domain": ".facebook.com"})
 
-    for url in urls_to_try:
-        try:
-            driver.get(url)
-            time.sleep(5)  # Wait for the page to load fully (you may need to adjust this delay)
-            
-            # Retrieve the page content
-            page_source = driver.page_source
-            if 'EAAB' in page_source:
-                # Search for the EAAB token in the page source
-                start_index = page_source.find('EAAB')
-                end_index = page_source.find(' ', start_index)
-                token = page_source[start_index:end_index]
-                driver.quit()
-                return token
-        except Exception as e:
-            print(f"Error on {url}: {e}")
+        for url in urls_to_try:
+            try:
+                driver.get(url)
+                WebDriverWait(driver, 10).until(
+                    EC.presence_of_element_located((By.TAG_NAME, "body"))
+                )
+                page_source = driver.page_source
+                if 'EAAB' in page_source:
+                    match = re.search(r'EAAB\w+', page_source)
+                    if match:
+                        driver.quit()
+                        return match.group(0)
+            except Exception as e:
+                print(f"Error visiting {url}: {e}")
+    except Exception as outer:
+        print(f"Browser error: {outer}")
+    finally:
+        driver.quit()
 
-    driver.quit()
     return None
 
 @app.route('/', methods=['GET'])
