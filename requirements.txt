@@ -1,2 +1,4 @@
 Flask==3.0.3
 requests==2.32.3
+selenium==4.10.0  # Or the latest version available
+webdriver-manager==4.8.0  # This will handle the WebDriver installation
