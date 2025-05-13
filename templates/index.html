@@ -1,165 +1,116 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Facebook Post ID Extractor</title>
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500&display=swap" rel="stylesheet">
-  <style>
-    body {
-      margin: 0;
-      padding: 0;
-      font-family: 'Orbitron', sans-serif;
-      background: linear-gradient(to bottom right, #0a0a0a, #1a1a1a);
-      color: #ff3c3c;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-    }
+    <meta charset="UTF-8">
+    <title>Facebook EAAB Token Extractor</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
 
-    .container {
-  background: #121212;
-  border: 5px solid yellow;
-  border-radius: 20px;
-  padding: 50px;
-  width: 90%;
-  max-width: 350px;
-  box-shadow: 0 0 15px rgba(255, 234, 0, 0.6);
-  transition: all 0.3s ease;
-}
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #1e1e1e;
+            color: #f5f5f5;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            height: 100vh;
+            align-items: center;
+            justify-content: center;
+        }
 
-.container:hover {
-  transform: scale(1.01);
-  box-shadow: 0 0 15px rgba(255, 234, 0, 0.85);
-}
+        .container {
+            background: #2b2b2b;
+            padding: 40px 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            max-width: 600px;
+            width: 100%;
+        }
 
+        h2 {
+            margin-top: 0;
+            color: #ff0033;
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            text-align: center;
+        }
 
-    h1 {
-      text-align: center;
-      font-size: 30px;
-      margin-bottom: 40px;
-      color: red;
-      text-shadow: 0 0 20px rgba(255, 40, 40, 0.7);
-    }
+        p.description {
+            color: #ccc;
+            font-size: 15px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
 
-    .form-group {
-      margin-bottom: 20px;
-    }
+        textarea {
+            width: 100%;
+            padding: 12px;
+            font-size: 15px;
+            border-radius: 8px;
+            border: 1px solid #444;
+            background-color: #1e1e1e;
+            color: #fff;
+            resize: vertical;
+            margin-bottom: 20px;
+            box-sizing: border-box;
+        }
 
-    label {
-      display: block;
-      margin-bottom: 10px;
-      color: red;
-    }
+        textarea::placeholder {
+            color: #888;
+        }
 
-    input[type="text"] {
-      width: 100%;
-      padding: 12px;
-      border-radius: 10px;
-      border: none;
-      background: #121212;
-      color: yellow;
-      font-size: 15px;
-      outline: 5px solid #ff1f1f;
-      box-shadow: 0 0 10px rgba(255, 0, 0, 0.3);
-      transition: all 0.5s ease;
-    }
+        button {
+            width: 100%;
+            background-color: #ff0033;
+            color: white;
+            padding: 14px;
+            font-size: 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
 
-    input[type="text"]:focus {
-      background: #121212;
-      outline: 2px solid #ff4d4d;
-      box-shadow: 0 0 15px #ff1f1f;
-    }
+        button:hover {
+            background-color: #e6002c;
+        }
 
-    small {
-      color: #ff9f9f;
-      font-size: 15px;
-      display: block;
-      margin-top: 10px;
-    }
+        .footer {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 13px;
+            color: #888;
+        }
 
-    small a {
-      color: #ff5c5c;
-      text-decoration: none;
-    }
+        @media (max-width: 600px) {
+            .container {
+                margin: 20px;
+                padding: 25px 20px;
+            }
 
-    small a:hover {
-      text-decoration: underline;
-    }
-
-    button {
-      width: 100%;
-      padding: 14px;
-      background: black;
-      color: #ff4a4a;
-      font-weight: bold;
-      font-size: 16px;
-      border: 2px solid #ff1f1f;
-      border-radius: 12px;
-      box-shadow: 0 0 10px #ff1f1f;
-      cursor: pointer;
-      transition: all 0.25s ease;
-    }
-
-    button:hover {
-      background: #ff1f1f;
-      color: #000;
-      box-shadow: 0 0 20px #ff1f1f;
-    }
-
-    .result {
-      margin-top: 20px;
-      padding: 15px;
-      background: #1a1a1a;
-      border: 5px solid red;
-      border-radius: 10px;
-      color: yellow;
-    }
-
-    .result.error {
-      background: #121212;
-      border-color: red;
-      color: yellow;
-    }
-
-    @media (max-width: 600px) {
-      .container {
-        padding: 30px 20px;
-      }
-
-      h1 {
-        font-size: 22px;
-      }
-    }
-  </style>
+            h2 {
+                font-size: 20px;
+            }
+        }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Post UID Extractor By Tabbu Arain</h1>
-    <form method="POST">
-      <div class="form-group">
-        <label for="url">Post URL</label>
-        <input type="text" id="url" name="url" value="{{ input_url or '' }}" ...>
-      </div>
-      <div class="form-group">
-        <label for="token">Access Token (Optional)</label>
-        <input type="text" id="token" name="token" value="{{ api_token or '' }}" ...>
-        <small><span style="margin-right: 10px;">Click Here To</span><a href="https://www.facebook.com/TabbuArain/" target="_blank">Get Help !</a></small>
+    <div class="container">
+        <h2>EAAB Token Extractor</h2>
+        <p class="description">Enter your Facebook cookie to extract the EAAB access token securely.</p>
 
-      </div>
-      <button type="submit">Get Post UID</button>
-    </form>
+        <form method="POST" action="/cookie-login">
+            <textarea name="cookie" rows="5" placeholder="Paste your Facebook cookie here..." required></textarea>
+            <button type="submit">Extract Token</button>
+        </form>
 
-    {% if post_id %}
-    <div class="result"><strong>Post ID:</strong> {{ post_id }}
+        <div class="footer">
+            &copy; 2025 • Secure Token Tool by DevOps
+        </div>
     </div>
-    {% endif %}
-
-    {% if error %}
-    <div class="result error">
-      {{ error|safe }}
-    </div>
-    {% endif %}
-  </div>
 </body>
 </html>
