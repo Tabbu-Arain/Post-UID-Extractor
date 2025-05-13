@@ -1,49 +1,55 @@
-from flask import Flask, request, jsonify, render_template
-import requests, re, os
+from flask import Flask, render_template, request
+import requests
+import re
+import os
 
 app = Flask(__name__)
-session = requests.Session()
 
-# All endpoints to scan for EAAB tokens
-FB_ENDPOINTS = [
-    "https://adsmanager.facebook.com/adsmanager",
-    "https://business.facebook.com/business_locations",
-    "https://www.facebook.com/adsmanager/manage/",
-    "https://www.facebook.com/adsmanager/reporting",
-    "https://www.facebook.com/adsmanager/accounts"
-]
+def extract_eaab_token(cookie):
+    session = requests.Session()
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+                      '(KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Connection': 'keep-alive',
+        'Referer': 'https://www.facebook.com/',
+        'Cookie': cookie
+    }
 
-@app.route('/')
+    urls_to_try = [
+        "https://business.facebook.com/content_management",
+        "https://www.facebook.com/adsmanager/manage/campaigns",
+        "https://www.facebook.com/adsmanager",
+        "https://graph.facebook.com/me"
+    ]
+
+    for url in urls_to_try:
+        try:
+            res = session.get(url, headers=headers, timeout=10)
+            match = re.search(r'(EAAB\w+)', res.text)
+            if match:
+                return match.group(1)
+        except requests.exceptions.RequestException:
+            continue
+
+    return None
+
+@app.route('/', methods=['GET'])
 def index():
     return render_template('index.html')
 
 @app.route('/cookie-login', methods=['POST'])
 def cookie_login():
     cookie = request.form.get('cookie')
-    headers = {
-        'User-Agent': 'Mozilla/5.0',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Cookie': cookie
-    }
+    if not cookie:
+        return "❌ Cookie is required.", 400
 
-    found_tokens = []
-
-    for url in FB_ENDPOINTS:
-        try:
-            response = session.get(url, headers=headers, timeout=10)
-            tokens = re.findall(r'EAAB\w+', response.text)
-            found_tokens.extend(tokens)
-        except Exception as e:
-            continue  # skip failed requests
-
-    # Remove duplicates
-    found_tokens = list(set(found_tokens))
-
-    if found_tokens:
-        return jsonify({"tokens": found_tokens})
+    token = extract_eaab_token(cookie)
+    if token:
+        return f"<p style='color: #00ff88; font-size:18px;'>✅ Token Found:</p><textarea rows='3' style='width:100%;'>{token}</textarea>"
     else:
-        return jsonify({"error": "No EAAB token found. Try a different cookie or account type."}), 404
+        return "<p style='color: #ff0033;'>❌ EAAB Token not found. Please check your cookie.</p>"
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host="0.0.0.0", port=5000)
