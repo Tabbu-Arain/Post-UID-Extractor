@@ -17,6 +17,7 @@ def extract_eaab_token(cookie):
         'Cookie': cookie
     }
 
+    # URLs to try to extract the EAAB token
     urls_to_try = [
         "https://business.facebook.com/content_management",
         "https://www.facebook.com/adsmanager/manage/campaigns",
@@ -26,11 +27,19 @@ def extract_eaab_token(cookie):
 
     for url in urls_to_try:
         try:
+            print(f"Trying URL: {url}")  # Debugging log
             res = session.get(url, headers=headers, timeout=10)
+
+            # Debugging: Log the response text to check if the EAAB token is in there
+            print(res.text[:1000])  # Print the first 1000 characters of the response for debugging
+
             match = re.search(r'(EAAB\w+)', res.text)
             if match:
+                print(f"Found EAAB Token: {match.group(1)}")  # Debugging log
                 return match.group(1)
-        except requests.exceptions.RequestException:
+
+        except requests.exceptions.RequestException as e:
+            print(f"Error with URL {url}: {e}")  # Error log
             continue
 
     return None
