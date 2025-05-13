@@ -4,7 +4,6 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-import shutil
 import os
 import re
 
@@ -18,17 +17,9 @@ def extract_eaab_token(cookie):
     chrome_options.add_argument('--disable-dev-shm-usage')
     chrome_options.add_argument('--disable-software-rasterizer')
 
-    # Render-specific Chromium path
-    chrome_path = shutil.which("chromium-browser") or shutil.which("chromium")
-    driver_path = shutil.which("chromedriver")
-
-    if not chrome_path or not driver_path:
-        return "Chromium or Chromedriver not found. Make sure they are installed on the server."
-
-    chrome_options.binary_location = chrome_path
-
-    # Initialize the driver
-    driver = webdriver.Chrome(executable_path=driver_path, options=chrome_options)
+    # ✅ Required for Render: Set path to Chromium binary and chromedriver
+    chrome_options.binary_location = "/usr/bin/google-chrome"
+    driver = webdriver.Chrome(executable_path="/usr/bin/chromedriver", options=chrome_options)
 
     urls_to_try = [
         "https://business.facebook.com/content_management",
