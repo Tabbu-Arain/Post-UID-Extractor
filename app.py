@@ -62,7 +62,7 @@ def extract_post_number(fb_url):
 
 @app.route('/')
 def home():
-    return app.send_static_file('../frontend/index.html')
+    return app.send_static_file('index.html')
 
 @app.route('/extract', methods=['POST'])
 def extract():
