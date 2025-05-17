@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Facebook Post Number Extractor</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
+        .container { background: #f5f5f5; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px; }
+        button { background: #4267B2; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; }
+        #result { margin-top: 20px; padding: 10px; border-radius: 4px; display: none; }
+        .success { background: #e9f7ef; }
+        .error { background: #fde8e8; color: #c53030; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Facebook Post Number Extractor</h1>
+        <p>Enter a Facebook post URL to extract the post number:</p>
+        <input type="text" id="fbUrl" placeholder="https://www.facebook.com/username/posts/123456789">
+        <button onclick="extractPostNumber()">Extract Post Number</button>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        async function extractPostNumber() {
+            const fbUrl = document.getElementById('fbUrl').value.trim();
+            const resultDiv = document.getElementById('result');
+            
+            if (!fbUrl) {
+                showResult('Please enter a Facebook post URL', 'error');
+                return;
+            }
+            
+            try {
+                showResult('Processing...', '');
+                
+                const response = await fetch('/extract', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: fbUrl }),
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult(`<strong>Post Number:</strong> ${data.post_number}`, 'success');
+                } else {
+                    showResult(data.error || 'Could not extract post number', 'error');
+                }
+            } catch (error) {
+                showResult('An error occurred while processing your request', 'error');
+                console.error('Error:', error);
+            }
+        }
+        
+        function showResult(message, className) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = message;
+            resultDiv.className = className;
+        }
+    </script>
+</body>
+</html>
