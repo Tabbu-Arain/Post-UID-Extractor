@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: facebook-post-scraper
+    runtime: python
+    buildCommand: |
+      chmod +x backend/build.sh
+      ./backend/build.sh
+    startCommand: |
+      chmod +x backend/start.sh
+      ./backend/start.sh
+    envVars:
+      - key: GOOGLE_CHROME_BIN
+        value: /usr/bin/google-chrome
+      - key: CHROMEDRIVER_PATH
+        value: /usr/local/bin/chromedriver
