@@ -6,8 +6,7 @@ services:
       chmod +x backend/build.sh
       ./backend/build.sh
     startCommand: |
-      chmod +x backend/start.sh
-      ./backend/start.sh
+      cd backend && chmod +x start.sh && ./start.sh
     envVars:
       - key: GOOGLE_CHROME_BIN
         value: /usr/bin/google-chrome
