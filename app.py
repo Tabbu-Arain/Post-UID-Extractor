@@ -11,13 +11,26 @@ import os
 
 app = Flask(__name__)
 
+import requests
+
 def extract_post_number(fb_url):
     """Extracts numeric post number from Facebook URL"""
-    url_pattern = r'(?:posts|permalink\.php\?story_fbid=)(\d+)'
-    match = re.search(url_pattern, fb_url)
+    url_pattern = r'(?:posts|permalink\.php\?story_fbid=|fbid=)(\d+)'
+    
+    # First, follow redirects to get real post URL (for short/share links)
+    try:
+        response = requests.get(fb_url, allow_redirects=True, timeout=10)
+        final_url = response.url
+        print(f"Resolved URL: {final_url}")
+    except Exception as e:
+        print(f"Error resolving URL: {e}")
+        return None
+
+    match = re.search(url_pattern, final_url)
     if match:
         return match.group(1)
-    
+
+    # fallback: scrape using selenium
     try:
         chrome_options = Options()
         chrome_options.add_argument("--headless")
@@ -27,10 +40,10 @@ def extract_post_number(fb_url):
         
         service = Service(executable_path=os.environ.get("CHROMEDRIVER_PATH"))
         driver = webdriver.Chrome(service=service, options=chrome_options)
-        driver.get(fb_url)
+        driver.get(final_url)
         time.sleep(5)
-        
-        # Meta tag approach
+
+        # Attempt to extract from meta tags
         meta_tags = driver.find_elements(By.TAG_NAME, 'meta')
         for tag in meta_tags:
             if 'post_id' in tag.get_attribute('property'):
@@ -38,8 +51,8 @@ def extract_post_number(fb_url):
                 post_id_match = re.search(r'(\d+)', content)
                 if post_id_match:
                     return post_id_match.group(1)
-        
-        # Timestamp link approach
+
+        # Try timestamp link
         try:
             timestamp_link = WebDriverWait(driver, 10).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, 'a[href*="/posts/"]'))
@@ -50,7 +63,7 @@ def extract_post_number(fb_url):
                 return post_id_match.group(1)
         except:
             pass
-        
+
     except Exception as e:
         print(f"Scraping error: {e}")
     finally:
@@ -58,6 +71,7 @@ def extract_post_number(fb_url):
             driver.quit()
         except:
             pass
+
     return None
 
 @app.route('/')
