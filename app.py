@@ -1,97 +1,74 @@
-from flask import Flask, request, jsonify, render_template
-import re
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-import time
-import os
-
-app = Flask(__name__)
-
+from flask import Flask, request, render_template_string
 import requests
 
-def extract_post_number(fb_url):
-    """Extracts numeric post number from Facebook URL"""
-    url_pattern = r'(?:posts|permalink\.php\?story_fbid=|fbid=)(\d+)'
-    
-    # First, follow redirects to get real post URL (for short/share links)
+app = Flask(_name_)
+
+HTML = '''
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Facebook Post UID Extractor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 40px;
+            background-color: #f2f2f2;
+        }
+        input[type="text"] {
+            width: 300px;
+            padding: 10px;
+            font-size: 16px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            margin-left: 10px;
+            cursor: pointer;
+        }
+        .result {
+            margin-top: 20px;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <h2>Facebook Post UID Extractor</h2>
+    <form method="POST">
+        <input type="text" name="post_url" placeholder="Paste Facebook Post URL here" required>
+        <button type="submit">Get UID</button>
+    </form>
+
+    {% if post_uid %}
+        <div class="result">
+            <strong>Post UID:</strong> {{ post_uid }}
+        </div>
+    {% endif %}
+</body>
+</html>
+'''
+
+def get_post_uid(post_url):
     try:
-        response = requests.get(fb_url, allow_redirects=True, timeout=10)
-        final_url = response.url
-        print(f"Resolved URL: {final_url}")
+        response = requests.post("https://kojaxd.xyz/getuid", data={"url": post_url}, timeout=10)
+        if response.status_code == 200:
+            return response.text.strip()
+        else:
+            return f"Error: Status code {response.status_code}"
     except Exception as e:
-        print(f"Error resolving URL: {e}")
-        return None
+        return f"Exception: {str(e)}"
 
-    match = re.search(url_pattern, final_url)
-    if match:
-        return match.group(1)
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    post_uid = None
+    if request.method == 'POST':
+        post_url = request.form.get('post_url')
+        if post_url:
+            post_uid = get_post_uid(post_url)
+    return render_template_string(HTML, post_uid=post_uid)
 
-    # fallback: scrape using selenium
-    try:
-        chrome_options = Options()
-        chrome_options.add_argument("--headless")
-        chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument("--no-sandbox")
-        chrome_options.binary_location = os.environ.get("GOOGLE_CHROME_BIN")
-        
-        service = Service(executable_path=os.environ.get("CHROMEDRIVER_PATH"))
-        driver = webdriver.Chrome(service=service, options=chrome_options)
-        driver.get(final_url)
-        time.sleep(5)
-
-        # Attempt to extract from meta tags
-        meta_tags = driver.find_elements(By.TAG_NAME, 'meta')
-        for tag in meta_tags:
-            if 'post_id' in tag.get_attribute('property'):
-                content = tag.get_attribute('content')
-                post_id_match = re.search(r'(\d+)', content)
-                if post_id_match:
-                    return post_id_match.group(1)
-
-        # Try timestamp link
-        try:
-            timestamp_link = WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, 'a[href*="/posts/"]'))
-            )
-            href = timestamp_link.get_attribute('href')
-            post_id_match = re.search(r'/posts/(\d+)', href)
-            if post_id_match:
-                return post_id_match.group(1)
-        except:
-            pass
-
-    except Exception as e:
-        print(f"Scraping error: {e}")
-    finally:
-        try:
-            driver.quit()
-        except:
-            pass
-
-    return None
-
-@app.route('/')
-def home():
-     return render_template('index.html')
-
-@app.route('/extract', methods=['POST'])
-def extract():
-    data = request.get_json()
-    fb_url = data.get('url', '')
-    
-    if not fb_url:
-        return jsonify({'error': 'URL is required'}), 400
-    
-    post_number = extract_post_number(fb_url)
-    
-    if post_number:
-        return jsonify({'post_number': post_number})
-    else:
-        return jsonify({'error': 'Could not extract post number'}), 404
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)))
+if _name_ == '_main_':
+    app.run(debug=True, port=10000)
