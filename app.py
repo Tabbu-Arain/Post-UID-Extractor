@@ -3,7 +3,7 @@ import requests
 import re
 import os
 
-app = Flask(_name_)
+app = Flask(__name__)
 
 def extract_uid_from_facebook_url(fb_url):
     try:
@@ -28,7 +28,7 @@ def index():
         fb_url = request.form.get('fb_url')
         uid, real_url = extract_uid_from_facebook_url(fb_url)
         if not uid:
-            error = "UID extract nahi ho paaya. URL galat hai ya redirect nahi ho raha."
+            error = "INVALID URL."
     return render_template_string("""
     <!DOCTYPE html>
     <html lang="en">
@@ -64,6 +64,6 @@ def index():
     </html>
     """, uid=uid, error=error, real_url=real_url)
 
-if _name_ == '_main_':
+if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(debug=False, host='0.0.0.0', port=port)
