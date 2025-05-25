@@ -1,7 +1,7 @@
 from flask import Flask, request, render_template_string
 import requests
 
-app = Flask(_name_)
+app = Flask(__name__)
 
 HTML = '''
 <!DOCTYPE html>
@@ -70,5 +70,5 @@ def index():
             post_uid = get_post_uid(post_url)
     return render_template_string(HTML, post_uid=post_uid)
 
-if _name_ == '_main_':
+if __name__ == '__main__':
     app.run(debug=True, port=10000)
