@@ -1,74 +1,69 @@
 from flask import Flask, request, render_template_string
 import requests
+import re
+import os
 
-app = Flask(__name__)
+app = Flask(_name_)
 
-HTML = '''
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Facebook Post UID Extractor</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            padding: 40px;
-            background-color: #f2f2f2;
-        }
-        input[type="text"] {
-            width: 300px;
-            padding: 10px;
-            font-size: 16px;
-        }
-        button {
-            padding: 10px 20px;
-            font-size: 16px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            margin-left: 10px;
-            cursor: pointer;
-        }
-        .result {
-            margin-top: 20px;
-            font-size: 18px;
-        }
-    </style>
-</head>
-<body>
-    <h2>Facebook Post UID Extractor</h2>
-    <form method="POST">
-        <input type="text" name="post_url" placeholder="Paste Facebook Post URL here" required>
-        <button type="submit">Get UID</button>
-    </form>
-
-    {% if post_uid %}
-        <div class="result">
-            <strong>Post UID:</strong> {{ post_uid }}
-        </div>
-    {% endif %}
-</body>
-</html>
-'''
-
-def get_post_uid(post_url):
+def extract_uid_from_facebook_url(fb_url):
     try:
-        response = requests.post("https://kojaxd.xyz/getuid", data={"url": post_url}, timeout=10)
-        if response.status_code == 200:
-            return response.text.strip()
+        response = requests.get(fb_url, allow_redirects=True, timeout=10)
+        final_url = response.url
+
+        # Match /posts/<post_id>, /permalink/<post_id>, or /videos/<video_id>
+        match = re.search(r"/(?:posts|permalink|videos)/(\d+)", final_url)
+        if match:
+            return match.group(1), final_url
         else:
-            return f"Error: Status code {response.status_code}"
+            return None, final_url
     except Exception as e:
-        return f"Exception: {str(e)}"
+        return str(e), None
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    post_uid = None
+    uid = None
+    error = None
+    real_url = None
     if request.method == 'POST':
-        post_url = request.form.get('post_url')
-        if post_url:
-            post_uid = get_post_uid(post_url)
-    return render_template_string(HTML, post_uid=post_uid)
+        fb_url = request.form.get('fb_url')
+        uid, real_url = extract_uid_from_facebook_url(fb_url)
+        if not uid:
+            error = "UID extract nahi ho paaya. URL galat hai ya redirect nahi ho raha."
+    return render_template_string("""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Facebook Post UID Extractor</title>
+        <style>
+            body { font-family: Arial, sans-serif; padding: 30px; background: #f8f8f8; }
+            form { margin-bottom: 20px; }
+            input[type="text"] { width: 60%; padding: 10px; }
+            button { padding: 10px 20px; }
+            .result { background: #fff; padding: 15px; border-radius: 5px; }
+            .error { color: red; }
+        </style>
+    </head>
+    <body>
+        <h2>Facebook Post UID Extractor</h2>
+        <form method="post">
+            <label>Facebook Post URL:</label><br><br>
+            <input type="text" name="fb_url" placeholder="https://www.facebook.com/share/p/..." required>
+            <button type="submit">Extract UID</button>
+        </form>
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=10000)
+        {% if uid %}
+        <div class="result">
+            <p><strong>Redirected URL:</strong> {{ real_url }}</p>
+            <p><strong>Post UID:</strong> {{ uid }}</p>
+        </div>
+        {% elif error %}
+        <p class="error">{{ error }}</p>
+        {% endif %}
+    </body>
+    </html>
+    """, uid=uid, error=error, real_url=real_url)
+
+if _name_ == '_main_':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=False, host='0.0.0.0', port=port)
